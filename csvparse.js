@@ -33,60 +33,7 @@ function mariaConHandler() {
 mariaConHandler();
 
 var csvArray = [];
-
-//data from: http://www-int.stsci.edu/~inr/intrins.html
-var spectrumConv = [
-  {'b-v':-0.30,sp:'B0.0'},
-  {'b-v':-0.28,sp:'B0.5'},
-  {'b-v':-0.26,sp:'B1.0'},
-  {'b-v':-0.25,sp:'B1.5'},
-  {'b-v':-0.24,sp:'B2.0'},
-  {'b-v':-0.22,sp:'B2.5'},
-  {'b-v':-0.20,sp:'B3.0'},
-  {'b-v':-0.19,sp:'B3.5'},
-  {'b-v':-0.18,sp:'B4.0'},
-  {'b-v':-0.17,sp:'B4.5'},
-  {'b-v':-0.16,sp:'B5.0'},
-  {'b-v':-0.14,sp:'B6.0'},
-  {'b-v':-0.13,sp:'B7.0'},
-  {'b-v':-0.12,sp:'B7.5'},
-  {'b-v':-0.11,sp:'B8.0'},
-  {'b-v':-0.09,sp:'B8.5'},
-  {'b-v':-0.07,sp:'B9.0'},
-  {'b-v':-0.04,sp:'B9.5'},
-  {'b-v':-0.01,sp:'A0.0'},
-  {'b-v':0.02,sp:'A1.0'},
-  {'b-v':0.05,sp:'A2.0'},
-  {'b-v':0.08,sp:'A3.0'},
-  {'b-v':0.12,sp:'A4.0'},
-  {'b-v':0.15,sp:'A5.0'},
-  {'b-v':0.17,sp:'A6.0'},
-  {'b-v':0.20,sp:'A7.0'},
-  {'b-v':0.27,sp:'A8.0'},
-  {'b-v':0.30,sp:'A9.0'},
-  {'b-v':0.32,sp:'F0.0'},
-  {'b-v':0.34,sp:'F1.0'},
-  {'b-v':0.35,sp:'F2.0'},
-  {'b-v':0.45,sp:'F5.0'},
-  {'b-v':0.53,sp:'F8.0'},
-  {'b-v':0.60,sp:'G0.0'},
-  {'b-v':0.63,sp:'G2.0'},
-  {'b-v':0.65,sp:'G3.0'},
-  {'b-v':0.68,sp:'G5.0'},
-  {'b-v':0.74,sp:'G8.0'},
-  {'b-v':0.81,sp:'K0.0'},
-  {'b-v':0.86,sp:'K1.0'},
-  {'b-v':0.92,sp:'K2.0'},
-  {'b-v':0.95,sp:'K3.0'},
-  {'b-v':1.00,sp:'K4.0'},
-  {'b-v':1.15,sp:'K5.0'},
-  {'b-v':1.33,sp:'K7.0'},
-  {'b-v':1.37,sp:'M0.0'},
-  {'b-v':1.47,sp:'M1.0'},
-  {'b-v':1.47,sp:'M2.0'},
-  {'b-v':1.50,sp:'M3.0'},
-  {'b-v':1.52,sp:'M4.0'},
-];
+var csvEditArray = [];
 
 csv().from.path(__dirname + fileName, {delimiter:','})
 .on('record', function(row, index){
@@ -107,14 +54,21 @@ csv().from.path(__dirname + fileName, {delimiter:','})
     ColorIndex: row[13]==''?null:row[13],
   };
   
-  csvArray.push(tempData);
+  //offset by one to eliminate column headers
+  if(index > 0) csvArray.push(tempData);
+  
+  //if distance data is valid, add to edited list and calulate Spectral type from ColorIndex
+  if(tempData.Distance != 10000000 && index > 0){
+    tempData.CalcSpectrum = convertSpecData(tempData.ColorIndex);
+    csvEditArray.push(tempData);
+  }
+  
   if(index % 1000 == 0){console.log(index);}
 })
 .on('end', function(count){
   console.log(count + ' rows added');
   console.log('array has: ' + csvArray.length + ' entries');
-  writeToDb(1); //fudge up by one to lose the column headers
-  //closeDbConnection();
+  writeToDb(0);
 })
 .on('error', function(error){
   console.log(error.message);
@@ -125,7 +79,8 @@ function writeToDb(rep){
     dbInsert(rep, function(){ writeToDb(rep + 1);});
   }else{
     console.log('wrote ' + rep + ' rows to db');
-    closeDbConnection();
+    //chain to 2nd set of db writes
+    WriteEditToDb(0);
   }
 }
 
@@ -137,6 +92,23 @@ function dbInsert(rep, callback){
   });  
 }
 
+function writeEditToDb(rep){
+  if(rep < csvEditArray.length){
+    dbEditInsert(rep, function(){ writeEditToDb(rep + 1);});
+  }else{
+    console.log('wrote ' + rep + ' edited rows to db');
+    closeDbConnection();
+  }
+}
+
+function dbEditInsert(rep, callback){
+  mariaConnection.query('INSERT INTO good_dist SET ?', csvEditArray[rep], function(err, result){
+    if(err){console.log(err);}
+    if(rep%100 == 0){console.log(rep);}
+    callback();
+  });
+}
+
 function closeDbConnection(){
   mariaConnection.end(function(err){
     if(err){
@@ -144,4 +116,67 @@ function closeDbConnection(){
     }
     console.log('database connection closed');
   });
+}
+
+//data from: http://www-int.stsci.edu/~inr/intrins.html
+var spectrumConv = [
+  {'bv':-0.30,sp:'B0.0'},
+  {'bv':-0.28,sp:'B0.5'},
+  {'bv':-0.26,sp:'B1.0'},
+  {'bv':-0.25,sp:'B1.5'},
+  {'bv':-0.24,sp:'B2.0'},
+  {'bv':-0.22,sp:'B2.5'},
+  {'bv':-0.20,sp:'B3.0'},
+  {'bv':-0.19,sp:'B3.5'},
+  {'bv':-0.18,sp:'B4.0'},
+  {'bv':-0.17,sp:'B4.5'},
+  {'bv':-0.16,sp:'B5.0'},
+  {'bv':-0.14,sp:'B6.0'},
+  {'bv':-0.13,sp:'B7.0'},
+  {'bv':-0.12,sp:'B7.5'},
+  {'bv':-0.11,sp:'B8.0'},
+  {'bv':-0.09,sp:'B8.5'},
+  {'bv':-0.07,sp:'B9.0'},
+  {'bv':-0.04,sp:'B9.5'},
+  {'bv':-0.01,sp:'A0.0'},
+  {'bv':0.02,sp:'A1.0'},
+  {'bv':0.05,sp:'A2.0'},
+  {'bv':0.08,sp:'A3.0'},
+  {'bv':0.12,sp:'A4.0'},
+  {'bv':0.15,sp:'A5.0'},
+  {'bv':0.17,sp:'A6.0'},
+  {'bv':0.20,sp:'A7.0'},
+  {'bv':0.27,sp:'A8.0'},
+  {'bv':0.30,sp:'A9.0'},
+  {'bv':0.32,sp:'F0.0'},
+  {'bv':0.34,sp:'F1.0'},
+  {'bv':0.35,sp:'F2.0'},
+  {'bv':0.45,sp:'F5.0'},
+  {'bv':0.53,sp:'F8.0'},
+  {'bv':0.60,sp:'G0.0'},
+  {'bv':0.63,sp:'G2.0'},
+  {'bv':0.65,sp:'G3.0'},
+  {'bv':0.68,sp:'G5.0'},
+  {'bv':0.74,sp:'G8.0'},
+  {'bv':0.81,sp:'K0.0'},
+  {'bv':0.86,sp:'K1.0'},
+  {'bv':0.92,sp:'K2.0'},
+  {'bv':0.95,sp:'K3.0'},
+  {'bv':1.00,sp:'K4.0'},
+  {'bv':1.15,sp:'K5.0'},
+  {'bv':1.33,sp:'K7.0'},
+  {'bv':1.37,sp:'M0.0'},
+  {'bv':1.47,sp:'M1.0'},
+  {'bv':1.47,sp:'M2.0'},
+  {'bv':1.50,sp:'M3.0'},
+  {'bv':1.52,sp:'M4.0'},
+];
+
+function convertSpecData(iBV){
+  for(var rep=0;rep<spectrumConv.length;rep++){
+    if(iBV <= spectrumConv[rep].bv){
+      return spectrumConv[rep].sp;
+    }
+  }
+  return spectrumConv[spectrumConv.length - 1].bv;
 }
