@@ -61,6 +61,7 @@ csv().from.path(__dirname + fileName, {delimiter:','})
   //if distance data is valid, add to edited list and calulate Spectral type from ColorIndex
   if(tempData.Distance != 10000000 && index > 0){
     var tempEditData = extend({}, tempData);
+    delete tempEditData.Gliese;
     tempEditData.CalcSpectrum = convertSpecData(tempEditData.ColorIndex);
     csvEditArray.push(tempEditData);
   }
