@@ -1,4 +1,5 @@
 var fs = require('fs');
+var extend = require('util')._extend;
 var csv = require('csv');
 var mariadb = require('mysql');
 var fileName = '/hygfull.csv';
@@ -59,7 +60,7 @@ csv().from.path(__dirname + fileName, {delimiter:','})
   
   //if distance data is valid, add to edited list and calulate Spectral type from ColorIndex
   if(tempData.Distance != 10000000 && index > 0){
-    var tempEditData = tempData.slice(0);
+    var tempEditData = extend({}, tempData);
     tempEditData.CalcSpectrum = convertSpecData(tempEditData.ColorIndex);
     csvEditArray.push(tempEditData);
   }
