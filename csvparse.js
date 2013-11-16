@@ -181,5 +181,5 @@ function convertSpecData(iBV){
       return spectrumConv[rep].sp;
     }
   }
-  return spectrumConv[spectrumConv.length - 1].bv;
+  return spectrumConv[spectrumConv.length - 1].sp;
 }
