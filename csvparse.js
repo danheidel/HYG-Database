@@ -82,7 +82,7 @@ function writeToDb(rep){
   }else{
     console.log('wrote ' + rep + ' rows to db');
     //chain to 2nd set of db writes
-    WriteEditToDb(0);
+    writeEditToDb(0);
   }
 }
 
